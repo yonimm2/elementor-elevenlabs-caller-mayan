@@ -55,41 +55,48 @@ app.post("/elementor/lead", async (req, res) => {
 
     console.log("[OK] Normalized phone:", normalized);
 
-    // CALL ELEVENLABS OUTBOUND
-    const payload = {
-      phone_number: normalized,
-      metadata: {
-        name,
-        source: "elementor"
-      },
-      conversation_initiation_client_data: {
-        source_info: {
-          name: "elementor-caller",
-          version: "1.0.0"
-        }
-      }
-    };
-
-    console.log("[ELEVENLABS PAYLOAD]", payload);
-
-    const response = await axios.post(
-      `https://api.elevenlabs.io/v1/convai/agents/${process.env.ELEVENLABS_AGENT_ID}/calls`,
-      payload,
-      {
-        headers: {
-          "xi-api-key": process.env.XI_API_KEY,
-          "Content-Type": "application/json"
-        }
-      }
-    );
-
-    console.log("[ELEVENLABS RESPONSE]", response.data);
-
-    return res.json({
+    // Immediate success (Elementor doesn't wait 45s)
+    res.json({
       success: true,
+      scheduled_in_seconds: 45,
       called: normalized,
-      agent: process.env.ELEVENLABS_AGENT_ID
+      agent: process.env.ELEVENLABS_AGENT_ID,
     });
+
+    // Delay 45 seconds before calling ElevenLabs
+    setTimeout(async () => {
+      try {
+        console.log("[DELAY] 45 seconds passed, triggering call...");
+
+        const payload = {
+          phone_number: normalized,
+          metadata: { name, source: "elementor" },
+          conversation_initiation_client_data: {
+            source_info: { name: "elementor-caller", version: "1.0.0" },
+          },
+        };
+
+        console.log("[ELEVENLABS PAYLOAD]", payload);
+
+        const response = await axios.post(
+          `https://api.elevenlabs.io/v1/convai/agents/${process.env.ELEVENLABS_AGENT_ID}/calls`,
+          payload,
+          {
+            headers: {
+              "xi-api-key": process.env.XI_API_KEY,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        console.log("[ELEVENLABS RESPONSE]", response.data);
+      } catch (delayErr) {
+        console.error(
+          "[DELAY CALL ERROR]",
+          delayErr.response?.data || delayErr.message
+        );
+      }
+    }, 45000); // 45 seconds
   } catch (err) {
     console.error("[SERVER ERROR]", err.response?.data || err.message);
     return res.status(500).json({ error: "Internal error" });
@@ -102,4 +109,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-
